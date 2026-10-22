@@ -10,7 +10,7 @@ A [Modsmith](https://github.com/thegalaxydev/modsmith) extension for viewing, cr
 
 ## Requirements
 
-- Modsmith 0.1.13 (the next release). Ponder Studio uses companion mods, bridge events and binary file writes, which arrive in that release.
+- Modsmith 0.1.13 or newer. Ponder Studio uses companion mods, bridge events and binary file writes, which arrived in 0.1.13.
 - For playback and export: a NeoForge 1.21.1 project with Create 6 as a runtime mod of the development client.
 
 Verified with NeoForge 21.1.262, Minecraft 1.21.1, Create 6.0.10 and Ponder 1.0.82+mc1.21.1 (bundled in Create) on Windows 11.
