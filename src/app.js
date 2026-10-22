@@ -1,6 +1,8 @@
 import { ACTIONS, DIRECTIONS, PALETTE, POINTING, TRACKS, boxesOf, compileStoryboard, diagnose, durationOf, endTick, newDocument, nextId, normalizeBox, seconds, stableJson, validateDocument } from './doc.js';
 import { History, Structure, parseState, stateKey } from './structure.js';
 import { Viewport, boxLines, colorFor, shapeFor } from './render.js';
+import { Atlas } from './atlas.js';
+import { bakeState, boxGeometry, tintFor } from './blockmodel.js';
 import { Timeline } from './timeline.js';
 import { nbtInspector } from './inspector.js';
 import { simulate, anchorPoint } from './sim.js';
@@ -11,6 +13,10 @@ import { listFiles } from './files.js';
 
 const M = 'ext.galaxy.ponder-studio.';
 const VERIFIED = { create: '6.0.10', ponder: '1.0.82+mc1.21.1' };
+const ANIMATED_PARTS = {
+  'create:powered_shaft': (props) => [['create:shaft', { axis: props?.axis ?? 'y' }]]
+};
+const swatchColors = new Map();
 const key = (x, y, z) => `${x},${y},${z}`;
 const unkey = (k) => k.split(',').map(Number);
 
@@ -43,6 +49,62 @@ class Studio {
     this.clipboard = null;
     this.paletteFilter = '';
     this.externalChange = null;
+    this.atlas = new Atlas();
+    this.models = {};
+    this.blockDefs = new Map();
+    this.baked = new Map();
+    this.wanted = new Map();
+    this.loadingModels = false;
+    this.textureError = null;
+  }
+
+  geometry(name, props) {
+    const k = stateKey(name, props);
+    let g = this.baked.get(k);
+    if (g) return g;
+    const def = this.blockDefs.get(k);
+    if (def) {
+      g = bakeState(def, this.models);
+      for (const [extraName, extraProps] of ANIMATED_PARTS[name]?.(props) ?? []) {
+        const extra = this.geometry(extraName, extraProps);
+        if (!extra.modelled) return extra;
+        g = { ...g, faces: [...g.faces, ...extra.faces], boxes: [...g.boxes, ...extra.boxes] };
+      }
+      if (!g.modelled) {
+        const shape = shapeFor(name, props);
+        g = boxGeometry(shape.boxes, g.particle, shape.full);
+      }
+      this.baked.set(k, g);
+      return g;
+    }
+    if (!this.textureError) this.wanted.set(k, { name, properties: props ?? {} });
+    const shape = shapeFor(name, props);
+    return boxGeometry(shape.boxes, null, shape.full);
+  }
+
+  async loadModels() {
+    if (this.loadingModels || !this.wanted.size || this.textureError) return;
+    this.loadingModels = true;
+    const batch = [...this.wanted.entries()].slice(0, 256);
+    for (const [k] of batch) this.wanted.delete(k);
+    try {
+      const r = await modsmith.call('assets.blocks', { blocks: batch.map(([, b]) => b) });
+      Object.assign(this.models, r.models ?? {});
+      await this.atlas.add(r.images ?? {});
+      (r.blocks ?? []).forEach((b, i) => {
+        this.blockDefs.set(batch[i][0], b);
+        const particle = b.parts?.map((p) => this.models[p.model]?.textures?.particle).find(Boolean);
+        const average = this.atlas.rect(particle)?.average;
+        if (average && !swatchColors.has(b.name)) swatchColors.set(b.name, average);
+      });
+      this.baked.clear();
+    } catch (e) {
+      this.textureError = /permission to use assets\.blocks|Unknown method/.test(e.message) ? 'Block textures need Modsmith 0.1.16 or newer' : `Block textures are unavailable: ${e.message}`;
+      this.wanted.clear();
+    } finally {
+      this.loadingModels = false;
+    }
+    if (this.structure) this.refresh();
   }
 
   async boot({ structureFile, docFile }) {
@@ -283,7 +345,7 @@ class Studio {
       if (!this.layerVisible(y)) return null;
       const b = this.structure.blockAt(x, y, z);
       if (!b || b.name === 'minecraft:air' || b.name === 'minecraft:structure_void') return null;
-      return shapeFor(b.name, b.props).boxes;
+      return this.geometry(b.name, b.props).boxes;
     });
   }
 
@@ -367,14 +429,16 @@ class Studio {
       } catch {
         st = { name: b.name, props: b.props };
       }
-      const shape = shapeFor(st.name, st.props);
+      const geo = this.geometry(st.name, st.props);
       const off = sim?.offsets.get(k) ?? [0, 0, 0];
       const ghost = sim ? !sim.visible.has(k) : false;
       if (ghost && !this.ghosts) continue;
       const color = colorFor(st.name);
       const selected = this.selection.has(k);
-      cells.set(k, { x: x + off[0], y: y + off[1], z: z + off[2], boxes: shape.boxes, full: shape.full && !off.some(Boolean), color, ghost, tint: selected ? [1.25, 1.25, 0.7] : undefined });
+      cells.set(k, { x: x + off[0], y: y + off[1], z: z + off[2], geo, boxes: geo.boxes, full: geo.full && !off.some(Boolean), color, foliage: tintFor(st.name, st.props), ghost, tint: selected ? [1.25, 1.25, 0.7] : undefined });
     }
+    this.viewport.setAtlas(this.atlas);
+    if (this.wanted.size) void this.loadModels();
     const lines = [];
     const overlay = [];
     if (this.doc && this.mode === 'storyboard' && this.activeAction) {
@@ -429,7 +493,8 @@ class Studio {
   }
 
   renderBadge() {
-    clear(this.badge, this.mode === 'storyboard' && this.doc ? `Structural preview · tick ${this.time} (${seconds(this.time)} s) · play in Minecraft for the real scene` : 'Structural preview · colours and shapes are approximate');
+    const note = this.textureError ?? (this.loadingModels || this.wanted.size ? 'Loading block textures…' : 'Block entities and animations are not drawn');
+    clear(this.badge, this.mode === 'storyboard' && this.doc ? `Preview · tick ${this.time} (${seconds(this.time)} s) · play in Minecraft for the real scene` : `Preview · ${note}`);
   }
 
   renderLayerBar() {
@@ -1459,7 +1524,7 @@ function* boxesPositionsCount(boxes) {
 }
 
 function swatch(name) {
-  const c = colorFor(name);
+  const c = swatchColors.get(name) ?? colorFor(name);
   return h('span', { class: 'swatch', style: { background: `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})` } });
 }
 

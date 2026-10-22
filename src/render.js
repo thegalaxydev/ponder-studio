@@ -1,17 +1,26 @@
 const VS = `attribute vec3 aPos;
+attribute vec2 aUv;
 attribute vec4 aColor;
 uniform mat4 uMvp;
+varying vec2 vUv;
 varying vec4 vColor;
 void main() {
   gl_Position = uMvp * vec4(aPos, 1.0);
+  vUv = aUv;
   vColor = aColor;
 }`;
 
 const FS = `precision mediump float;
+uniform sampler2D uTex;
+varying vec2 vUv;
 varying vec4 vColor;
 void main() {
-  gl_FragColor = vColor;
+  vec4 c = texture2D(uTex, vUv) * vColor;
+  if (c.a < 0.08) discard;
+  gl_FragColor = c;
 }`;
+
+const STRIDE = 9;
 
 function mat4Perspective(fov, aspect, near, far) {
   const f = 1 / Math.tan(fov / 2);
@@ -112,19 +121,11 @@ export function shapeFor(name, props) {
   if (base === 'large_cogwheel') return { boxes: [disc(-0.44, 1.44, 0.375, 0.625), along(0, 1, 0.375, 0.625)], full: false };
   if (/_slab$/.test(base)) return props?.type === 'top' ? { boxes: [[0, 0.5, 0, 1, 1, 1]], full: false } : props?.type === 'double' ? { boxes: [[0, 0, 0, 1, 1, 1]], full: true } : { boxes: [[0, 0, 0, 1, 0.5, 1]], full: false };
   if (/carpet|pressure_plate|redstone_wire|rail/.test(base)) return { boxes: [[0, 0, 0, 1, 0.0625, 1]], full: false };
+  if (base === 'belt' && (props?.slope ?? 'horizontal') === 'horizontal') return { boxes: [[0, 0.0625, 0, 1, 0.3125, 1]], full: false };
   if (/torch|lantern|flower|sapling|button|lever/.test(base)) return { boxes: [[0.375, 0, 0.375, 0.625, 0.625, 0.625]], full: false };
   if (/fence|wall$|pane|bars/.test(base)) return { boxes: [[0.375, 0, 0.375, 0.625, 1, 0.625]], full: false };
   return { boxes: [[0, 0, 0, 1, 1, 1]], full: true };
 }
-
-const FACES = [
-  { n: [0, 1, 0], shade: 1.0, c: (b) => [[b[0], b[4], b[2]], [b[0], b[4], b[5]], [b[3], b[4], b[5]], [b[3], b[4], b[2]]] },
-  { n: [0, -1, 0], shade: 0.5, c: (b) => [[b[0], b[1], b[2]], [b[3], b[1], b[2]], [b[3], b[1], b[5]], [b[0], b[1], b[5]]] },
-  { n: [0, 0, -1], shade: 0.8, c: (b) => [[b[0], b[1], b[2]], [b[0], b[4], b[2]], [b[3], b[4], b[2]], [b[3], b[1], b[2]]] },
-  { n: [0, 0, 1], shade: 0.8, c: (b) => [[b[0], b[1], b[5]], [b[3], b[1], b[5]], [b[3], b[4], b[5]], [b[0], b[4], b[5]]] },
-  { n: [-1, 0, 0], shade: 0.6, c: (b) => [[b[0], b[1], b[2]], [b[0], b[1], b[5]], [b[0], b[4], b[5]], [b[0], b[4], b[2]]] },
-  { n: [1, 0, 0], shade: 0.6, c: (b) => [[b[3], b[1], b[2]], [b[3], b[4], b[2]], [b[3], b[4], b[5]], [b[3], b[1], b[5]]] }
-];
 
 export class Viewport {
   constructor(canvas) {
@@ -145,8 +146,16 @@ export class Viewport {
     gl.linkProgram(prog);
     this.prog = prog;
     this.aPos = gl.getAttribLocation(prog, 'aPos');
+    this.aUv = gl.getAttribLocation(prog, 'aUv');
     this.aColor = gl.getAttribLocation(prog, 'aColor');
     this.uMvp = gl.getUniformLocation(prog, 'uMvp');
+    this.uTex = gl.getUniformLocation(prog, 'uTex');
+    this.texture = gl.createTexture();
+    this.atlas = null;
+    this.atlasVersion = -1;
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    this.textureFilters();
     this.buffers = { opaque: gl.createBuffer(), clear: gl.createBuffer(), lines: gl.createBuffer(), overlay: gl.createBuffer() };
     this.counts = { opaque: 0, clear: 0, lines: 0, overlay: 0 };
     this.camera = { target: [2.5, 1, 2.5], yaw: -0.75, pitch: 0.55, dist: 12 };
@@ -154,6 +163,25 @@ export class Viewport {
     this.cells = new Map();
     this.size = [5, 3, 5];
     this.pending = false;
+  }
+
+  textureFilters() {
+    const gl = this.gl;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
+  setAtlas(atlas) {
+    this.atlas = atlas;
+    if (!atlas || atlas.version === this.atlasVersion || !atlas.canvas.width) return;
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas.canvas);
+    this.textureFilters();
+    this.atlasVersion = atlas.version;
   }
 
   setBackground(css) {
@@ -174,22 +202,40 @@ export class Viewport {
     this.size = size;
     const opaque = [];
     const clear = [];
+    const atlas = this.atlas;
+    const white = atlas?.white ?? { u0: 0, v0: 0, u1: 0, v1: 0 };
+    const sprite = (id) => atlas?.rect(id) ?? null;
+    const see = (c) => {
+      if (c.solid !== undefined) return c.solid;
+      c.solid = !!c.full && !c.ghost && c.color[3] >= 1 && !c.geo.faces.some((f) => sprite(f.texture)?.translucent);
+      return c.solid;
+    };
     const solid = (x, y, z) => {
       const c = cells.get(`${x},${y},${z}`);
-      return c && c.full && !c.ghost && c.color[3] >= 1;
+      return !!c && see(c);
     };
     for (const c of cells.values()) {
-      const target = c.ghost || c.color[3] < 1 ? clear : opaque;
+      c.solid = undefined;
       const alpha = c.ghost ? 0.22 : c.color[3];
-      for (const b of c.boxes) {
-        const box = [c.x + b[0], c.y + b[1], c.z + b[2], c.x + b[3], c.y + b[4], c.z + b[5]];
-        for (const f of FACES) {
-          if (c.full && !c.ghost && solid(c.x + f.n[0], c.y + f.n[1], c.z + f.n[2])) continue;
-          const tint = c.tint ?? [1, 1, 1];
-          const col = [c.color[0] * f.shade * tint[0], c.color[1] * f.shade * tint[1], c.color[2] * f.shade * tint[2], alpha];
-          const q = f.c(box);
-          for (const i of [0, 1, 2, 0, 2, 3]) target.push(...q[i], ...col);
-        }
+      const pick = c.tint ?? [1, 1, 1];
+      for (const f of c.geo.faces) {
+        if (f.cull && !c.ghost && solid(c.x + f.cull[0], c.y + f.cull[1], c.z + f.cull[2])) continue;
+        const s = sprite(f.texture);
+        const base = s ? [1, 1, 1] : c.color;
+        const tint = f.tint >= 0 && s ? c.foliage ?? [1, 1, 1] : [1, 1, 1];
+        const col = [base[0] * f.shade * tint[0] * pick[0], base[1] * f.shade * tint[1] * pick[1], base[2] * f.shade * tint[2] * pick[2], alpha];
+        const r = s ?? white;
+        const target = c.ghost || alpha < 1 || s?.translucent ? clear : opaque;
+        const du = r.u1 - r.u0;
+        const dv = r.v1 - r.v0;
+        const eu = Math.min(Math.abs(du) * 0.002, 0.0001);
+        const ev = Math.min(Math.abs(dv) * 0.002, 0.0001);
+        const vtx = f.verts.map((p, i) => {
+          const u = Math.min(r.u1 - eu, Math.max(r.u0 + eu, r.u0 + (f.uv[i][0] / 16) * du));
+          const v = Math.min(r.v1 - ev, Math.max(r.v0 + ev, r.v0 + (f.uv[i][1] / 16) * dv));
+          return [c.x + p[0], c.y + p[1], c.z + p[2], u, v, ...col];
+        });
+        for (const i of [0, 1, 2, 0, 2, 3]) target.push(...vtx[i]);
       }
     }
     const grid = [];
@@ -217,9 +263,15 @@ export class Viewport {
 
   upload(name, data) {
     const gl = this.gl;
+    let out = data;
+    if (name === 'lines' || name === 'overlay') {
+      const w = this.atlas?.white ?? { u0: 0, v0: 0 };
+      out = [];
+      for (let i = 0; i + 7 <= data.length; i += 7) out.push(data[i], data[i + 1], data[i + 2], w.u0, w.v0, data[i + 3], data[i + 4], data[i + 5], data[i + 6]);
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers[name]);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.DYNAMIC_DRAW);
-    this.counts[name] = data.length / 7;
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.DYNAMIC_DRAW);
+    this.counts[name] = out.length / STRIDE;
   }
 
   eye() {
@@ -258,6 +310,9 @@ export class Viewport {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.prog);
     gl.uniformMatrix4fv(this.uMvp, false, this.matrices().mvp);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.uniform1i(this.uTex, 0);
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -276,9 +331,11 @@ export class Viewport {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers[name]);
     gl.enableVertexAttribArray(this.aPos);
-    gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, 28, 0);
+    gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, STRIDE * 4, 0);
+    gl.enableVertexAttribArray(this.aUv);
+    gl.vertexAttribPointer(this.aUv, 2, gl.FLOAT, false, STRIDE * 4, 12);
     gl.enableVertexAttribArray(this.aColor);
-    gl.vertexAttribPointer(this.aColor, 4, gl.FLOAT, false, 28, 12);
+    gl.vertexAttribPointer(this.aColor, 4, gl.FLOAT, false, STRIDE * 4, 20);
     gl.drawArrays(mode, 0, this.counts[name]);
   }
 

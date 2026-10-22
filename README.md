@@ -10,7 +10,7 @@ A [Modsmith](https://github.com/thegalaxydev/modsmith) extension for viewing, cr
 
 ## Requirements
 
-- Modsmith 0.1.13 or newer. Ponder Studio uses companion mods, bridge events and binary file writes, which arrived in 0.1.13.
+- Modsmith 0.1.13 or newer. Ponder Studio uses companion mods, bridge events and binary file writes, which arrived in 0.1.13. Blocks are drawn with their textures and models from Modsmith 0.1.16; with older versions they are coloured boxes.
 - For playback and export: a NeoForge 1.21.1 project with Create 6 as a runtime mod of the development client.
 
 Verified with NeoForge 21.1.262, Minecraft 1.21.1, Create 6.0.10 and Ponder 1.0.82+mc1.21.1 (bundled in Create) on Windows 11.
@@ -20,6 +20,8 @@ Verified with NeoForge 21.1.262, Minecraft 1.21.1, Create 6.0.10 and Ponder 1.0.
 ### Opening a structure
 
 Click a `.nbt` file under `src/main/resources/assets/<mod>/ponder/`. If a storyboard already uses it, the storyboard opens. Otherwise Ponder Studio shows the structure and offers **Create storyboard**. The **Ponder** panel on the left rail lists the project's storyboards, structures that have none yet, and the scenes registered in the running game.
+
+Blocks are drawn with the models and textures from the project, its mods (such as Create) and Minecraft, following each block state's blockstate file: rotations, multipart pieces such as redstone wire, and tinted grass, leaves and water. Parts that the game draws in code, such as the spinning middle of a shaft, belts, chests, fluids and the steam engine's piston, are not models, so they appear as simple shapes or are left out; powered shafts are drawn with a plain shaft.
 
 ### Build mode
 
@@ -44,7 +46,7 @@ The timeline has five tracks: Structure, Text, Highlights, Camera and Kinetics. 
 
 Actions that overlap run at the same time, as they do in Ponder. Only gaps become `idle` calls.
 
-The preview in the editor is a structural preview: it shows which blocks are visible, captions, outlines and the camera, but not Create's models or animation. **Play in Minecraft** sends the storyboard to the development client and opens it in the real Ponder screen. The second set of playback buttons controls that screen, and seeking replays from the start, as Ponder does.
+The preview in the editor shows which blocks are visible, captions, outlines and the camera with the blocks' textures, but not Create's animation. **Play in Minecraft** sends the storyboard to the development client and opens it in the real Ponder screen. The second set of playback buttons controls that screen, and seeking replays from the start, as Ponder does.
 
 ### Saving
 
@@ -119,7 +121,7 @@ The companion mod (`companion/neoforge-1.21.1`) is client-only. It registers bri
 ## Limitations
 
 - Only NeoForge 1.21.1 is supported for playback and export. Fabric and other versions need their own adapter and companion build.
-- The editor preview does not render Create's models or animation; use **Play in Minecraft** for that.
+- The editor preview draws block models but not what the game draws in code (spinning parts, belts, fluids) or animation; use **Play in Minecraft** for that.
 - Selecting blocks by clicking inside the Minecraft window is not supported; select them in Ponder Studio's viewport.
 - Java import covers the subset above.
 - Extension frames were not tried on Linux.
