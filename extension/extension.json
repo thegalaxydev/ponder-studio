@@ -1,11 +1,12 @@
 {
   "id": "galaxy.ponder-studio",
   "name": "Ponder Studio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "Galaxy Development",
   "description": "View, create and edit Create/Ponder tutorials: a structure editor, a storyboard timeline, playback through the real Ponder in the running game, and Java export.",
   "modsmith": "0.1.13",
   "license": "Apache-2.0",
+  "repository": "https://github.com/thegalaxydev/ponder-studio",
   "main": "main.js",
   "style": "style.css",
   "permissions": ["project.read", "project.write", "game", "build", "companion"],
