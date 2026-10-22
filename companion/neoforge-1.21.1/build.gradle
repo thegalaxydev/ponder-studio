@@ -1,0 +1,44 @@
+plugins {
+	id 'java-library'
+	id 'net.neoforged.moddev' version '2.0.148'
+}
+
+base {
+	archivesName = 'ponder-studio-companion-neoforge-1.21.1'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+	version = project.neo_version
+
+	parchment {
+		mappingsVersion = project.parchment_mappings_version
+		minecraftVersion = project.parchment_minecraft_version
+	}
+
+	mods {
+		ponder_studio {
+			sourceSet(sourceSets.main)
+		}
+	}
+}
+
+dependencies {
+	compileOnly files('libs/modsmith-bridge-neoforge-1.21.1.jar')
+	compileOnly files("libs/create-1.21.1-${project.create_version}.jar")
+	compileOnly files("libs/ponder-neoforge-${project.ponder_version}.jar")
+	compileOnly files("libs/flywheel-neoforge-1.21.1-${project.flywheel_version}.jar")
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+	filesMatching("META-INF/neoforge.mods.toml") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}

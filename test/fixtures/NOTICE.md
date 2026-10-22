@@ -1,0 +1,1 @@
+`KineticsScenes.java`, `shaft_relay.nbt` and `cog_small.nbt` are copied from [Create](https://github.com/Creators-of-Create/Create) 6.0.10, which is released under the MIT License. They are used only as test input.

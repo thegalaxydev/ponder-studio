@@ -1,0 +1,46 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="Apache-2.0"
+
+[[mods]]
+modId="ponder_studio"
+version="${version}"
+displayName="Ponder Studio Companion"
+authors="Galaxy Development"
+displayTest="IGNORE_ALL_VERSION"
+description='''Development-only companion for the Ponder Studio extension of Modsmith. Plays authored and registered Create/Ponder scenes through the Modsmith bridge.'''
+
+[[dependencies.ponder_studio]]
+modId="neoforge"
+type="required"
+versionRange="[21.1,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.ponder_studio]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.ponder_studio]]
+modId="modsmith_bridge"
+type="required"
+versionRange="[0.1,)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.ponder_studio]]
+modId="ponder"
+type="optional"
+versionRange="[1.0,2.0)"
+ordering="AFTER"
+side="CLIENT"
+
+[[dependencies.ponder_studio]]
+modId="create"
+type="optional"
+versionRange="[6.0,7.0)"
+ordering="AFTER"
+side="CLIENT"

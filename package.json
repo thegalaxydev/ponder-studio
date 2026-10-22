@@ -1,0 +1,21 @@
+{
+  "name": "ponder-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ponder Studio: a Modsmith extension for viewing, creating and editing Create/Ponder tutorials",
+  "license": "Apache-2.0",
+  "scripts": {
+    "fetch-libs": "node scripts/fetch-libs.mjs",
+    "build:companion": "node scripts/build-companion.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "build": "node scripts/build-web.mjs && node scripts/build-companion.mjs && node scripts/pack.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "fflate": "^0.8.2",
+    "java-parser": "^3.0.1",
+    "vitest": "^3.2.4"
+  }
+}

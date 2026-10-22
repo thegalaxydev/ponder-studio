@@ -1,0 +1,10 @@
+node_modules/
+dist/
+companion/*/build/
+companion/*/.gradle/
+companion/*/libs/create-*.jar
+companion/*/libs/ponder-*.jar
+companion/*/libs/flywheel-*.jar
+extension/main.js
+extension/mods/
+*.zip

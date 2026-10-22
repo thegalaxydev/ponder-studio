@@ -1,0 +1,20 @@
+{
+  "id": "galaxy.ponder-studio",
+  "name": "Ponder Studio",
+  "version": "0.1.0",
+  "publisher": "Galaxy Development",
+  "description": "View, create and edit Create/Ponder tutorials: a structure editor, a storyboard timeline, playback through the real Ponder in the running game, and Java export.",
+  "modsmith": "0.1.13",
+  "license": "Apache-2.0",
+  "main": "main.js",
+  "style": "style.css",
+  "permissions": ["project.read", "project.write", "game", "build", "companion"],
+  "contributes": {
+    "viewers": [
+      { "id": "structure", "title": "Ponder Studio", "files": ["src/main/resources/assets/*/ponder/**/*.nbt"] },
+      { "id": "document", "title": "Ponder Studio", "files": ["*.ponderstudio.json"] }
+    ],
+    "panels": [{ "id": "scenes", "title": "Ponder" }],
+    "mods": [{ "file": "mods/ponder-studio-companion-neoforge-1.21.1.jar", "loader": "neoforge", "minecraft": "1.21.1" }]
+  }
+}
