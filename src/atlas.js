@@ -7,6 +7,7 @@ export class Atlas {
     this.sprites = new Map();
     this.white = { u0: 0.5, v0: 0.5, u1: 0.5, v1: 0.5, translucent: false, average: [1, 1, 1] };
     this.version = 0;
+    this.pack();
   }
 
   async add(images) {
