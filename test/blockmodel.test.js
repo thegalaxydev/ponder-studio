@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bakeState, boxGeometry, tintFor } from '../src/blockmodel.js';
+import { bakeState, boxGeometry, connectedIndex, connectedUV, faceFrame, tintFor } from '../src/blockmodel.js';
 
 const cube = { elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: { north: { texture: '#all', cullface: 'north' }, up: { texture: '#all', cullface: 'up', tintindex: 0 } } }], textures: { all: 'minecraft:block/stone', particle: 'minecraft:block/stone' } };
 const plate = { elements: [{ from: [4, 0, 4], to: [12, 2, 12], faces: { down: { texture: '#all' } } }], textures: { all: 'minecraft:block/lever_base' } };
@@ -53,5 +53,32 @@ describe('block model baking', () => {
     expect(tintFor('minecraft:oak_leaves')).toEqual([0.35, 0.68, 0.19]);
     expect(tintFor('minecraft:water')).toEqual([0.25, 0.46, 0.89]);
     expect(tintFor('minecraft:redstone_wire', { power: '15' })).toEqual([1, 0, 0]);
+  });
+});
+
+describe('connected textures', () => {
+  const none = { up: false, down: false, left: false, right: false, topLeft: false, topRight: false, bottomLeft: false, bottomRight: false };
+
+  it('reads the texture frame of a face in world directions', () => {
+    const g = bakeState({ parts: [{ model: 'm:cube', x: 0, y: 0, uvlock: false }] }, { 'm:cube': cube });
+    expect(faceFrame(g.faces[0])).toEqual({ right: [-1, 0, 0], up: [0, 1, 0] });
+    expect(faceFrame(g.faces[1])).toEqual({ right: [1, 0, 0], up: [0, 0, -1] });
+    const p = bakeState({ parts: [{ model: 'm:plate', x: 0, y: 0, uvlock: false }] }, { 'm:plate': plate });
+    expect(faceFrame(p.faces[0])).toBeNull();
+  });
+
+  it('picks the omnidirectional tile as Create does', () => {
+    expect(connectedIndex(none)).toBe(0);
+    expect(connectedIndex({ ...none, right: true })).toBe(16);
+    expect(connectedIndex({ ...none, left: true, right: true })).toBe(24);
+    expect(connectedIndex({ ...none, up: true, left: true })).toBe(9);
+    expect(connectedIndex({ ...none, up: true, left: true, topLeft: true })).toBe(12);
+    expect(connectedIndex({ up: true, down: true, left: true, right: true, topLeft: true, topRight: true, bottomLeft: true, bottomRight: true })).toBe(54);
+    expect(connectedIndex({ ...none, up: true, down: true, left: true, topLeft: true })).toBe(33);
+  });
+
+  it('maps face UVs into the chosen tile of the sheet', () => {
+    expect(connectedUV([[0, 0], [16, 0], [16, 16], [0, 16]], 9)).toEqual([[2, 2], [4, 2], [4, 4], [2, 4]]);
+    expect(connectedUV([[0, 0], [16, 0], [16, 16], [0, 16]], 63)).toEqual([[14, 14], [16, 14], [16, 16], [14, 16]]);
   });
 });

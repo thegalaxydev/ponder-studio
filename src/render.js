@@ -1,3 +1,5 @@
+import { connectedIndex, connectedUV, faceFrame } from './blockmodel.js';
+
 const VS = `attribute vec3 aPos;
 attribute vec2 aUv;
 attribute vec4 aColor;
@@ -214,6 +216,15 @@ export class Viewport {
       const c = cells.get(`${x},${y},${z}`);
       return !!c && see(c);
     };
+    const links = (c, { right, up }, normal) => {
+      const same = (h, v) => {
+        const p = c.pos.map((x, i) => x + right[i] * h + up[i] * v);
+        const o = cells.get(p.join(','));
+        if (!o || o.name !== c.name || o.ghost) return false;
+        return cells.get(p.map((x, i) => x + normal[i]).join(','))?.name !== c.name;
+      };
+      return { up: same(0, 1), down: same(0, -1), left: same(-1, 0), right: same(1, 0), topLeft: same(-1, 1), topRight: same(1, 1), bottomLeft: same(-1, -1), bottomRight: same(1, -1) };
+    };
     for (const c of cells.values()) {
       c.solid = undefined;
       const alpha = c.ghost ? 0.22 : c.color[3];
@@ -224,15 +235,22 @@ export class Viewport {
         const base = s ? [1, 1, 1] : c.color;
         const tint = f.tint >= 0 && s ? c.foliage ?? [1, 1, 1] : [1, 1, 1];
         const col = [base[0] * f.shade * tint[0] * pick[0], base[1] * f.shade * tint[1] * pick[1], base[2] * f.shade * tint[2] * pick[2], alpha];
-        const r = s ?? white;
+        let r = s ?? white;
+        let uv = f.uv;
+        const sheet = s && !c.ghost && c.name ? atlas.sheet(f.texture) : null;
+        const frame = sheet && faceFrame(f);
+        if (frame) {
+          r = sheet;
+          uv = connectedUV(f.uv, connectedIndex(links(c, frame, f.cull)));
+        }
         const target = c.ghost || alpha < 1 || s?.translucent ? clear : opaque;
         const du = r.u1 - r.u0;
         const dv = r.v1 - r.v0;
         const eu = Math.min(Math.abs(du) * 0.002, 0.0001);
         const ev = Math.min(Math.abs(dv) * 0.002, 0.0001);
         const vtx = f.verts.map((p, i) => {
-          const u = Math.min(r.u1 - eu, Math.max(r.u0 + eu, r.u0 + (f.uv[i][0] / 16) * du));
-          const v = Math.min(r.v1 - ev, Math.max(r.v0 + ev, r.v0 + (f.uv[i][1] / 16) * dv));
+          const u = Math.min(r.u1 - eu, Math.max(r.u0 + eu, r.u0 + (uv[i][0] / 16) * du));
+          const v = Math.min(r.v1 - ev, Math.max(r.v0 + ev, r.v0 + (uv[i][1] / 16) * dv));
           return [c.x + p[0], c.y + p[1], c.z + p[2], u, v, ...col];
         });
         for (const i of [0, 1, 2, 0, 2, 3]) target.push(...vtx[i]);

@@ -90,6 +90,7 @@ class Studio {
     try {
       const r = await modsmith.call('assets.blocks', { blocks: batch.map(([, b]) => b) });
       Object.assign(this.models, r.models ?? {});
+      Object.assign(this.atlas.connected, r.connected ?? {});
       await this.atlas.add(r.images ?? {});
       (r.blocks ?? []).forEach((b, i) => {
         this.blockDefs.set(batch[i][0], b);
@@ -435,7 +436,7 @@ class Studio {
       if (ghost && !this.ghosts) continue;
       const color = colorFor(st.name);
       const selected = this.selection.has(k);
-      cells.set(k, { x: x + off[0], y: y + off[1], z: z + off[2], geo, boxes: geo.boxes, full: geo.full && !off.some(Boolean), color, foliage: tintFor(st.name, st.props), ghost, tint: selected ? [1.25, 1.25, 0.7] : undefined });
+      cells.set(k, { name: st.name, pos: [x, y, z], x: x + off[0], y: y + off[1], z: z + off[2], geo, boxes: geo.boxes, full: geo.full && !off.some(Boolean), color, foliage: tintFor(st.name, st.props), ghost, tint: selected ? [1.25, 1.25, 0.7] : undefined });
     }
     this.viewport.setAtlas(this.atlas);
     if (this.wanted.size) void this.loadModels();

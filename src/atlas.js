@@ -5,6 +5,7 @@ export class Atlas {
     this.canvas = document.createElement('canvas');
     this.images = new Map();
     this.sprites = new Map();
+    this.connected = {};
     this.white = { u0: 0.5, v0: 0.5, u1: 0.5, v1: 0.5, translucent: false, average: [1, 1, 1] };
     this.version = 0;
     this.pack();
@@ -32,6 +33,13 @@ export class Atlas {
 
   rect(id) {
     return (id && this.sprites.get(id)) || null;
+  }
+
+  sheet(id) {
+    const to = this.connected[id];
+    const base = this.images.get(id);
+    const sheet = to && this.images.get(to);
+    return base && sheet && sheet.width === base.width * 8 ? this.rect(to) : null;
   }
 
   pack() {

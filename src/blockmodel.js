@@ -167,3 +167,51 @@ export function tintFor(name, props) {
   if (/stem/.test(base)) return [0.6, 0.75, 0.2];
   return GRASS;
 }
+
+export function faceFrame(face) {
+  if (!face.cull) return null;
+  const at = (u, v) => face.uv.findIndex((p) => p[0] === u && p[1] === v);
+  const [a, b, c, d] = [at(0, 0), at(16, 0), at(16, 16), at(0, 16)];
+  if (a < 0 || b < 0 || c < 0 || d < 0) return null;
+  const step = (p, q) => p.map((x, i) => x - q[i]);
+  const right = step(face.verts[b], face.verts[a]);
+  const up = step(face.verts[a], face.verts[d]);
+  const unit = (v) => v.every((x) => x === 0 || Math.abs(x) === 1) && v.filter((x) => x !== 0).length === 1;
+  return unit(right) && unit(up) ? { right, up } : null;
+}
+
+export function connectedIndex({ up, down, left, right, topLeft, topRight, bottomLeft, bottomRight }) {
+  const borders = !up + !down + !left + !right;
+  let tileX = (up ? 1 : 0) + (down ? 2 : 0);
+  let tileY = (left ? 1 : 0) + (right ? 2 : 0);
+  if (borders === 0) {
+    if (topRight) tileX++;
+    if (topLeft) tileX += 2;
+    if (bottomRight) tileY += 2;
+    if (bottomLeft) tileY++;
+  }
+  if (borders === 1) {
+    if (!right && (topLeft || bottomLeft)) {
+      tileY = 4;
+      tileX = -1 + (bottomLeft ? 1 : 0) + (topLeft ? 1 : 0) * 2;
+    }
+    if (!left && (topRight || bottomRight)) {
+      tileY = 5;
+      tileX = -1 + (bottomRight ? 1 : 0) + (topRight ? 1 : 0) * 2;
+    }
+    if (!down && (topLeft || topRight)) {
+      tileY = 6;
+      tileX = -1 + (topLeft ? 1 : 0) + (topRight ? 1 : 0) * 2;
+    }
+    if (!up && (bottomLeft || bottomRight)) {
+      tileY = 7;
+      tileX = -1 + (bottomLeft ? 1 : 0) + (bottomRight ? 1 : 0) * 2;
+    }
+  }
+  if (borders === 2 && ((up && left && topLeft) || (down && left && bottomLeft) || (up && right && topRight) || (down && right && bottomRight))) tileX += 3;
+  return tileX + 8 * tileY;
+}
+
+export function connectedUV(uv, index) {
+  return uv.map(([u, v]) => [((index % 8) * 16 + u) / 8, (Math.floor(index / 8) * 16 + v) / 8]);
+}
